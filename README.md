@@ -18,10 +18,9 @@ Git Stack Expander is a simple tool designed to solve this problem in a simpler 
 
 ## Installation
 
-[source,bash]
-----
+~~~~
 $ sudo npm install -g git-stack-expander
-____
+~~~~
 
 ## Features
 
@@ -34,10 +33,9 @@ ____
 
 Basic Usage:
 
-[source,bash]
-----
+~~~~
 $ cd /path/to/workspace
 $ git-stack-expander
-----
+~~~~
 
 [See Wiki](https://github.com/shannah/git-stack-expander/wiki/Usage-Instructions)
