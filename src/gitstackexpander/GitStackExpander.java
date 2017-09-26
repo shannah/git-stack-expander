@@ -57,11 +57,11 @@ public class GitStackExpander {
         
         GitStackExpander exp = new GitStackExpander();
         
-        System.out.println(exp.findProjectWithRevisionId(null, args[0]));
+        //System.out.println(exp.findProjectWithRevisionId(null, args[0]));
         
-        System.out.println(exp.findFile(exp.getWorkspace(), "LayeredLayoutEditorKit.java", "com.codename1.guibuilder.layeredlayout.LayeredLayoutEditorKit$AbstractWidgetEditor.getUnfilledConstraints"));
-        System.out.println(exp.getRangeAsString(exp.getWorkspace(), "LayeredLayoutEditorKit.java", "com.codename1.guibuilder.layeredlayout.LayeredLayoutEditorKit$AbstractWidgetEditor.getUnfilledConstraints", 9508, 9511));
-        System.out.println(exp.getRangeAsString(exp.getWorkspace(), "at com.codename1.guibuilder.layeredlayout.LayeredLayoutEditorKit$AbstractWidgetEditor.getUnfilledConstraints(LayeredLayoutEditorKit.java:9508)", 3, 3));
+        //System.out.println(exp.findFile(exp.getWorkspace(), "LayeredLayoutEditorKit.java", "com.codename1.guibuilder.layeredlayout.LayeredLayoutEditorKit$AbstractWidgetEditor.getUnfilledConstraints"));
+        //System.out.println(exp.getRangeAsString(exp.getWorkspace(), "LayeredLayoutEditorKit.java", "com.codename1.guibuilder.layeredlayout.LayeredLayoutEditorKit$AbstractWidgetEditor.getUnfilledConstraints", 9508, 9511));
+        //System.out.println(exp.getRangeAsString(exp.getWorkspace(), "at com.codename1.guibuilder.layeredlayout.LayeredLayoutEditorKit$AbstractWidgetEditor.getUnfilledConstraints(LayeredLayoutEditorKit.java:9508)", 3, 3));
         EventQueue.invokeLater(()->{
             App app = exp.newApp();
             app.pack();
