@@ -12,9 +12,10 @@ Git Stack Expander is a simple tool designed to solve this problem in a simpler 
 
 ## Requirements
 
-* OS X
 * NodeJS
-* Git (Comes installed on OS X)
+* Git
+
+NOTE: Git must be in the CLI environment path.  On OS X it is like this by default.  On Windows, it will be in the path by default if you use the Git Bash (recommended). 
 
 ## Installation
 
