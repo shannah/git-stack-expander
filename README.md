@@ -2,7 +2,7 @@
 
 > Java Stack Trace + Git Commit ID = Useful Crash Report
 
-![Screenshot](https://github.com/shannah/git-stack-expander/wiki/images/Screenshot.png)
+![Screenshot](https://github.com/shannah/git-stack-expander/wiki/images/Screenshot2.png)
 
 ## Synopsis
 
