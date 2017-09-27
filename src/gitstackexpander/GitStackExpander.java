@@ -21,18 +21,24 @@ import java.net.URISyntaxException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
@@ -150,7 +156,7 @@ public class GitStackExpander {
         return true;
     }
     
-    private void checkoutRevision(File project, String tagName, String revision) throws IOException, InterruptedException {
+    private void checkoutRevision(File project, String revision) throws IOException, InterruptedException {
         ProcessBuilder pb = new ProcessBuilder();
         pb.directory(project);
         pb.command(gitPath, "checkout", revision);
@@ -161,140 +167,145 @@ public class GitStackExpander {
         
     }
     
-    private Date getDateForRevision(String githubUrl, String revisionId, String tagName) throws IOException, InterruptedException {
-        ProcessBuilder pb = new ProcessBuilder();
-        pb.directory(getWorkspace(githubUrl));
-        String revNum = tagName == null ? revisionId : tagName+"^"+revisionId;
-        pb.command(gitPath, "show", "-s", "--format=%ct", revNum);
-        Process p = pb.start();
-        try (InputStream is = p.getInputStream()) {
-            Scanner scanner = new Scanner(is);
-            String result = scanner.nextLine();
-            Date dt = new Date(Long.parseLong(result) * 1000l);
-            return dt;
-            
-        }
-    }
     
-    private Date getDateForRevision(File project, String revisionId, String tagName) throws IOException, InterruptedException {
-        ProcessBuilder pb = new ProcessBuilder();
-        pb.directory(project);
-        String revNum = tagName == null ? revisionId : tagName+"^"+revisionId;
-        pb.command(gitPath, "show", "-s", "--format=%ct", revNum);
-        Process p = pb.start();
-        try (InputStream is = p.getInputStream()) {
-            Scanner scanner = new Scanner(is);
-            String result = scanner.nextLine();
-            Date dt = new Date(Long.parseLong(result) * 1000l);
-            return dt;
-            
-        }
-    }
-    
-    private String getRevisionForDate(String githubUrl, String tagName, Date dt) throws IOException, InterruptedException {
-        if (tagName == null) {
-            tagName = "master";
-        }
-        ProcessBuilder pb = new ProcessBuilder();
-        pb.directory(getWorkspace(githubUrl));
-        pb.command(gitPath, "checkout", tagName);
-        Process p = pb.start();
-        if (p.waitFor() != 0) {
-            throw new IOException("Failed to check out tag "+tagName);
-        }
-        
-        pb = new ProcessBuilder();
-        pb.directory(getWorkspace(githubUrl));
-        pb.command(gitPath, "log", "--pretty=format:%H %cd", "--date=raw");
-        p = pb.start();
-        try (InputStream is = p.getInputStream()) {
-            Scanner scanner = new Scanner(is);
-            while (scanner.hasNextLine()) {
-                String line = scanner.nextLine();
-                String revId = line.substring(0, line.indexOf(" "));
-                String ts = line.substring(line.indexOf(" ")+1);
-                ts = ts.substring(0, ts.indexOf(" "));
-                Date tds = new Date(Long.parseLong(ts)*1000l);
-                if (tds.getTime() <= dt.getTime()) {
-                    return revId;
-                }
-            }
-        }
-        return null;
-        
-    }
-    
-    private String getRevisionForDate(File project, String tagName, Date dt) throws IOException, InterruptedException {
-        if (tagName == null) {
-            tagName = "master";
-        }
-        ProcessBuilder pb = new ProcessBuilder();
-        pb.directory(project);
-        pb.command(gitPath, "checkout", tagName);
-        Process p = pb.start();
-        if (p.waitFor() != 0) {
-            throw new IOException("Failed to check out tag "+tagName);
-        }
-        
-        pb = new ProcessBuilder();
-        pb.directory(project);
-        pb.command(gitPath, "log", "--pretty=format:%H %cd", "--date=raw");
-        p = pb.start();
-        try (InputStream is = p.getInputStream()) {
-            Scanner scanner = new Scanner(is);
-            while (scanner.hasNextLine()) {
-                String line = scanner.nextLine();
-                String revId = line.substring(0, line.indexOf(" "));
-                String ts = line.substring(line.indexOf(" ")+1);
-                ts = ts.substring(0, ts.indexOf(" "));
-                Date tds = new Date(Long.parseLong(ts)*1000l);
-                if (tds.getTime() <= dt.getTime()) {
-                    return revId;
-                }
-            }
-        }
-        return null;
-        
-    }
-    
-    private File findProjectWithRevisionId(String tagName, String commit) throws IOException, InterruptedException {
-        if (tagName == null) tagName = "master";
-        File workspace = getWorkspace();
-        for (File project : workspace.listFiles()) {
+    private Date getDateForRevision(File project, String revisionId) throws IOException, InterruptedException {
+        //String currRev = getCurrentRevisionOrBranch(project);
+        try {
+            checkoutRevision(project, revisionId);
             ProcessBuilder pb = new ProcessBuilder();
             pb.directory(project);
-            pb.command(gitPath, "fetch", "origin");
-            pb.inheritIO();
+            String revNum = revisionId;
+            pb.command(gitPath, "show", "-s", "--format=%ct");
             Process p = pb.start();
-            
-            if (p.waitFor() != 0) {
-                throw new IOException("Failed to fetch origin for project "+project);
+            try (InputStream is = p.getInputStream()) {
+                Scanner scanner = new Scanner(is);
+                String result = scanner.nextLine();
+                Date dt = new Date(Long.parseLong(result) * 1000l);
+                return dt;
+            }   
+        } finally {
+            //checkoutRevision(project, currRev);
+        }
+    }
+    
+    private String getCurrentRevisionOrBranch(File project) throws IOException {
+        ProcessBuilder pb = new ProcessBuilder();
+        pb.directory(project);
+        pb.command(gitPath, "branch");
+        Process p = pb.start();
+        try (InputStream is = p.getInputStream()) {
+            Scanner scanner = new Scanner(is);
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine().trim();
+                if (line.startsWith("* ")) {
+                    line = line.substring(2);
+                    if (line.startsWith("(HEAD detached at")) {
+                        line = line.substring("(HEAD detached at ".length());
+                        line = line.substring(0, line.length()-1);
+                    }
+                    return line.trim();
+                }
+                
             }
-            pb = new ProcessBuilder();
+        }
+        
+        return null;
+    }
+    
+    private String getRevisionForDate(File project, String branch, Date dt) throws IOException, InterruptedException {
+        //String currRev = getCurrentRevisionOrBranch(project);
+        try {
+            //if (branch != null) {
+            //    checkoutRevision(project, branch);
+            //}
+
+            ProcessBuilder pb = new ProcessBuilder();
             pb.directory(project);
-            pb.command(gitPath, "checkout", tagName);
-            p = pb.start();
-            if (p.waitFor() != 0) {
-                throw new IOException("Failed to checkout "+tagName+ " of project "+project);
-            }
-            
-            pb = new ProcessBuilder();
-            pb.directory(project);
-            pb.command(gitPath, "log", "--pretty=format:%H %h");
-            p = pb.start();
-            
+            pb.command(gitPath, "log", "--pretty=format:%H %cd", "--date=raw", "--branches="+branch);
+            Process p = pb.start();
             try (InputStream is = p.getInputStream()) {
                 Scanner scanner = new Scanner(is);
                 while (scanner.hasNextLine()) {
                     String line = scanner.nextLine();
-                    String longId = line.substring(0, line.indexOf(" "));
-                    String shortId = line.substring(line.indexOf(" ")+1);
-                    if (commit.equals(longId) || commit.equals(shortId)) {
-                        return project;
+                    String revId = line.substring(0, line.indexOf(" "));
+                    String ts = line.substring(line.indexOf(" ")+1);
+                    ts = ts.substring(0, ts.indexOf(" "));
+                    Date tds = new Date(Long.parseLong(ts)*1000l);
+                    if (tds.getTime() <= dt.getTime()) {
+                        return revId;
                     }
                 }
             }
+            return null;
+        } finally {
+            //checkoutRevision(project, currRev);
+        }
+        
+    }
+    
+    
+    
+    private File findProjectWithRevisionId(String commit) throws IOException, InterruptedException {
+        File workspace = getWorkspace();
+        for (File project : workspace.listFiles()) {
             
+            //String currBranch = getCurrentRevisionOrBranch(project);
+            try {
+                
+                ProcessBuilder pb = new ProcessBuilder();
+                pb.directory(project);
+                pb.command(gitPath, "log", "--all", "--pretty=format:%H %h");
+                Process p = pb.start();
+
+                try (InputStream is = p.getInputStream()) {
+                    Scanner scanner = new Scanner(is);
+                    while (scanner.hasNextLine()) {
+                        String line = scanner.nextLine();
+                        String longId = line.substring(0, line.indexOf(" "));
+                        String shortId = line.substring(line.indexOf(" ")+1);
+                        if (commit.equals(longId) || commit.equals(shortId)) {
+                            return project;
+                        }
+                    }
+                }
+                
+            } finally {
+                //checkoutRevision(project, currBranch);
+            }
+
+        }
+        for (File project : workspace.listFiles()) {
+            
+            String currBranch = getCurrentRevisionOrBranch(project);
+            try {
+                try {
+                    checkoutRevision(project, commit);
+                    return project;
+                } catch (Throwable t) {
+                    continue;
+                }
+                /*
+                ProcessBuilder pb = new ProcessBuilder();
+                pb.directory(project);
+                pb.command(gitPath, "log", "--all", "--pretty=format:%H %h");
+                Process p = pb.start();
+
+                try (InputStream is = p.getInputStream()) {
+                    Scanner scanner = new Scanner(is);
+                    while (scanner.hasNextLine()) {
+                        String line = scanner.nextLine();
+                        String longId = line.substring(0, line.indexOf(" "));
+                        String shortId = line.substring(line.indexOf(" ")+1);
+                        if (commit.equals(longId) || commit.equals(shortId)) {
+                            return project;
+                        }
+                    }
+                }
+                */
+            } finally {
+                checkoutRevision(project, currBranch);
+            }
+
         }
         
         return null;
@@ -440,25 +451,73 @@ public class GitStackExpander {
         }
     }
     
-    private void setProjectsToRevision(String tagName, String revision, File... projects) throws IOException, InterruptedException {
-        File paceProject = findProjectWithRevisionId(tagName, revision);
+    private List<String> getTags(File projectDir) throws IOException, InterruptedException {
+        List<String> out = new ArrayList<String>();
+        ProcessBuilder pb = new ProcessBuilder();
+        pb.directory(projectDir);
+        pb.command(gitPath, "tag", "--list");
+        Process p = pb.start();
+        try (InputStream is = p.getInputStream()) {
+            Scanner scanner = new Scanner(is);
+            while (scanner.hasNextLine()) {
+                out.add(scanner.nextLine());
+            }
+        }
+        if (p.waitFor() != 0) {
+            throw new RuntimeException("Error code");
+        }
+        return out;
+        
+    }
+    
+    private List<String> getBranches(File projectDir) throws IOException {
+        List<String> out = new ArrayList<String>();
+        ProcessBuilder pb = new ProcessBuilder();
+        pb.directory(projectDir);
+        pb.command(gitPath, "branch", "--list");
+        Process p = pb.start();
+        try (InputStream is = p.getInputStream()) {
+            Scanner scanner = new Scanner(is);
+            while (scanner.hasNextLine()) {
+                String line = scanner.nextLine().trim();
+                if (line.startsWith("* ")) {
+                    line = line.substring(2).trim();
+                }
+                if (line.startsWith("(HEAD detached")) {
+                    continue;
+                }
+                out.add(line.trim());
+            }
+        }
+        return out;
+        
+    }
+    
+    private void setProjectsToRevision(String revision, Map<File,String> branches, File... projects) throws IOException, InterruptedException {
+        System.out.println("Setting projects "+Arrays.toString(projects)+" to revision "+revision);
+        File paceProject = findProjectWithRevisionId(revision);
         if (paceProject == null) {
             throw new FileNotFoundException("Could not find project in workspace with given revision: "+revision);
         }
+        paceProject = projects[0];
         
-        Date dt = getDateForRevision(paceProject, revision, tagName);
+        
+        Date dt = getDateForRevision(paceProject, revision);
         if (dt == null) {
             throw new FileNotFoundException("Failed to get date for revision "+revision);
         }
         for (File project : projects) {
-            try {
-                String rev = getRevisionForDate(project, tagName, dt);
-                if (rev == null) {
-                    throw new FileNotFoundException("Project "+project+" has no revision corresponding to "+revision);
-                }
-                //updateProject(project);
-                checkoutRevision(project, null, rev);
-            } catch (Throwable t){}
+            if (branches.containsKey(project)) {
+                try {
+                    String rev = getRevisionForDate(project, branches.get(project), dt);
+                    if (rev == null) {
+                        throw new FileNotFoundException("Project "+project+" has no revision corresponding to "+revision);
+                    }
+                    //updateProject(project);
+                    checkoutRevision(project, rev);
+                } catch (Throwable t){}
+            }
+        
             
         }
     }
@@ -473,12 +532,20 @@ public class GitStackExpander {
         JTextArea input, output;
         JSplitPane splitPane;
         JProgressBar progress;
+        JPanel commitPanel;
+        
+        
+        
         App() {
             try {
                 setTitle(getWorkspace().getCanonicalFile().getName());
             } catch (Throwable t){}
             getRootPane().putClientProperty("Window.documentFile", getWorkspace());
             getContentPane().setLayout(new BorderLayout());
+            
+            commitPanel = new JPanel();
+            commitPanel.setLayout(new BoxLayout(commitPanel, BoxLayout.Y_AXIS));
+            
             
             progress = new JProgressBar();
             progress.setIndeterminate(true);
@@ -524,15 +591,69 @@ public class GitStackExpander {
                 progress.setValue(0);
                 
                 progress.setVisible(true);
+                
+                final Map<String,String> projectCommits = new HashMap<String,String>();
+                final Map<String,String> projectLinks = new HashMap<String,String>();
+                final Map<String,String> projectBranches = new HashMap<String,String>();
+                for (String projectName : commitComboBoxes.keySet()) {
+                    JComboBox cb = commitComboBoxes.get(projectName);
+                    String selectedItem = (String)cb.getSelectedItem();
+                    if (selectedItem.equals("")) {
+                        continue;
+                    } else if (selectedItem.startsWith("Link to ")) {
+                        String linkedProjectName = selectedItem.substring("Link to ".length());
+                        
+                        File linkedProjectF = new File(getWorkspace(), linkedProjectName);
+                        if (!linkedProjectF.isDirectory()) {
+                            continue;
+                        }
+                        projectLinks.put(projectName, linkedProjectF.getName());
+                        
+                    } else {
+                        String commitId = selectedItem;
+                        if (commitId.indexOf(" ") != -1) {
+                            commitId = commitId.substring(0, selectedItem.indexOf(" "));
+                        }
+                        projectCommits.put(projectName, commitId);
+                    }
+                }
+                for (String projectName : branchComboBoxes.keySet()) {
+                    JComboBox cb = branchComboBoxes.get(projectName);
+                    String selectedItem = (String)cb.getSelectedItem();
+                    
+                    String branchName = selectedItem;
+                    
+                    projectBranches.put(projectName, branchName);
+                    if (!projectCommits.containsKey(projectName)) {
+                        projectCommits.put(projectName, branchName);
+                    }
+                    
+                }
                 SwingWorker worker = new SwingWorker<String,String>() {
 
                     @Override
                     protected String doInBackground() throws Exception {
-                        if (commitHash != null) {
-                            setProjectsToRevision(null, commitHash, getWorkspace().listFiles());
+                        StringBuilder sb = new StringBuilder();
+                        for (String projectName : projectCommits.keySet()) {
+                            List<File> ps = new ArrayList<File>();
+                            ps.add(new File(getWorkspace(), projectName));
+                            for (String dependentProject : projectLinks.keySet()) {
+                                if (projectName.equals(projectLinks.get(dependentProject))) {
+                                    ps.add(new File(getWorkspace(), dependentProject));
+                                }
+                            }
+                            Map<File, String> branches = new HashMap<File, String>();
+                            for (File proj : ps) {
+                                if (projectBranches.containsKey(proj.getName())) {
+                                    branches.put(proj, projectBranches.get(proj.getName()));
+                                }
+                            }
+                            setProjectsToRevision(projectCommits.get(projectName), branches, ps.toArray(new File[ps.size()]));
+                            for (File p : ps) {
+                                sb.append("Checking out "+p.getName()+"@"+getCurrentRevisionOrBranch(p)).append("\n");
+                            }
                         }
                         
-                        StringBuilder sb = new StringBuilder();
                         Scanner s = new Scanner(inputString);
                         while (s.hasNextLine()) {
                             
@@ -540,7 +661,25 @@ public class GitStackExpander {
                             if (line.contains("Codename One revisions:")) {
                                 final String newHash = line.substring(line.lastIndexOf(" ")).trim();
                                 if (newHash.length() == 40) {
-                                    setProjectsToRevision(null, newHash, getWorkspace().listFiles());
+                                    File targetProject = findProjectWithRevisionId(newHash);
+                                    List<File> ps = new ArrayList<File>();
+                                    ps.add(targetProject);
+                                    for (String dependentProject : projectLinks.keySet()) {
+                                        if (targetProject.getName().equals(projectLinks.get(dependentProject))) {
+                                            ps.add(new File(getWorkspace(), dependentProject));
+                                        }
+                                    }
+                                    Map<File, String> branches = new HashMap<File, String>();
+                                    for (File proj : ps) {
+                                        if (projectBranches.containsKey(proj.getName())) {
+                                            branches.put(proj, projectBranches.get(proj.getName()));
+                                        }
+                                    }
+                                    System.out.println(branches);
+                                    setProjectsToRevision(newHash, branches,  ps.toArray(new File[ps.size()]));
+                                    for (File p : ps) {
+                                        sb.append("Checking out "+p.getName()+"@"+getCurrentRevisionOrBranch(p)).append("\n");
+                                    }
                                     EventQueue.invokeLater(()->{
                                         commit.setText(newHash);
                                     });
@@ -601,16 +740,19 @@ public class GitStackExpander {
             after.setToolTipText("Enter the number of lines after each stack frame to print.  Default 0");
             
             JPanel north = new JPanel(new FlowLayout());
-            north.add(new JLabel("Commit:"));
-            north.add(commit);
+            //north.add(new JLabel("Commit:"));
+            //north.add(commit);
             north.add(new JLabel("-B:"));
             north.add(before);
             north.add(new JLabel("-A:"));
             north.add(after);
             
+            JPanel northWrapper = new JPanel();
+            northWrapper.setLayout(new BorderLayout());
+            northWrapper.add(BorderLayout.NORTH, north);
+            northWrapper.add(BorderLayout.CENTER, commitPanel);
             
-            
-            getContentPane().add(BorderLayout.NORTH, north);
+            getContentPane().add(BorderLayout.NORTH, northWrapper);
             getContentPane().add(BorderLayout.CENTER, splitPane);
             
             JPanel south = new JPanel(new FlowLayout());
@@ -618,8 +760,106 @@ public class GitStackExpander {
             south.add(help);
             south.add(progress);
             getContentPane().add(BorderLayout.SOUTH, south);
+            buildCommitPanel();
             
             
+        }
+        
+        private Map<String,JComboBox> commitComboBoxes = new HashMap<String,JComboBox>();
+        private Map<String,JComboBox> branchComboBoxes = new HashMap<String,JComboBox>();
+        
+        private void buildCommitPanel() {
+            commitPanel.removeAll();
+            commitComboBoxes.clear();
+            branchComboBoxes.clear();
+            final 
+            SwingWorker projectFinder = new SwingWorker<List<File>, Void>() {
+                Map<File,List<String>> options = new HashMap<File,List<String>>();
+                Map<File,List<String>> boptions = new HashMap<File,List<String>>();
+                @Override
+                protected List<File> doInBackground() throws Exception {
+                    
+                    List<File> out = new ArrayList<File>();
+                    for (File f : getWorkspace().listFiles()) {
+                        if (f.isDirectory()) {
+                            out.add(f);
+                        }
+                    }
+                    
+                    for (File f : out) {
+                        List<String> opts = new ArrayList<String>();
+                         opts.add("");
+                        List<String> bopts = new ArrayList<String>();
+                        for (File f2 : out) {
+                            if (!f2.equals(f)) {
+                                opts.add("Link to "+f2.getName());
+                            }
+                        }
+                       
+                        opts.addAll(getTags(f));
+                        bopts.addAll(getBranches(f));
+                        /*
+                        ProcessBuilder pb = new ProcessBuilder();
+                        pb.directory(f);
+                        pb.command(gitPath, "log", "--pretty=format:%H %cd");
+                        Process p = pb.start();
+                        try (InputStream is = p.getInputStream()) {
+                            Scanner scanner = new Scanner(is);
+                           
+                            //opts.add("");
+                            for (File f2 : out) {
+                                if (!f2.equals(f)) {
+                                    opts.add("Link to "+f2.getName());
+                                }
+                            }
+                            while (scanner.hasNextLine()) {
+                                opts.add(scanner.nextLine());
+                            }
+                            
+                        }
+                        */
+                        
+                        opts.add("Other...");
+                        options.put(f, opts);
+                        boptions.put(f, bopts);
+                    }
+                    
+                    return out;
+                }
+
+                @Override
+                protected void done() {
+                    for (File f : options.keySet()) {
+                        JPanel p = new JPanel(new FlowLayout());
+                        p.add(new JLabel(f.getName()));
+                        JComboBox<String> cb = new JComboBox<String>(options.get(f).toArray(new String[options.get(f).size()]));
+                        cb.addActionListener(e->{
+                            if (cb.getSelectedItem().equals("Other...")) {
+                                String commitID = JOptionPane.showInputDialog("Commit ID:");
+                                cb.addItem(commitID);
+                                cb.setSelectedItem(commitID);
+                            }
+                            
+                        });
+                        JComboBox<String> bcb = new JComboBox<String>(boptions.get(f).toArray(new String[boptions.get(f).size()]));
+                        bcb.addActionListener(e->{
+                            
+                        });
+                        p.add(cb);
+                        p.add(new JLabel("Branch:"));
+                        p.add(bcb);
+                        commitComboBoxes.put(f.getName(), cb);
+                        branchComboBoxes.put(f.getName(), bcb);
+                        commitPanel.add(p);
+                    }
+                    revalidate();
+                    super.done();
+                }
+                
+                
+                
+            };
+            projectFinder.execute();
         }
     }
     
